@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import { Plus, Trash2, Edit2, Package, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Edit2, Package, AlertTriangle, FileText, MessageCircle, Printer } from 'lucide-react';
 import { fmtEGP } from '@/lib/format';
 import {
   PAYMENT_STATUSES, PAYMENT_METHODS, ALL_STATUSES, updateBooking,
@@ -11,9 +11,18 @@ import {
   addUsedPart, updateUsedPart, deleteUsedPart, bookingJobTotals, partTotals,
 } from '@/lib/usedParts';
 import {
+  getInvoiceNumber, openInvoiceWindow, getInvoiceWhatsAppLink,
+} from '@/lib/invoice';
+import {
   Field, Input, Select, TextArea, PrimaryButton, GhostButton, ErrorBanner,
   Modal, ConfirmModal, cx,
 } from './ui';
+
+const PAYMENT_BADGE = {
+  unpaid:  { color: '#FFB020' },
+  partial: { color: '#3B82F6' },
+  paid:    { color: '#25D366' },
+};
 
 // Sync booking payment_status from amountPaid/totalInvoice
 function derivePaymentStatus(amountPaid, total) {
@@ -256,17 +265,29 @@ export default function JobCostPanel({ booking, usedParts, inventory, refresh })
         </div>
       </div>
 
-      {/* Totals strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-white/10 border border-white/10">
-        <Cell label="Parts cost" value={fmtEGP(totals.totalPartsCost)} accent="#FFB020" />
-        <Cell label="Parts sales" value={fmtEGP(totals.totalPartsSelling)} accent="#3B82F6" />
-        <Cell label="Parts profit" value={fmtEGP(totals.totalPartsProfit)} accent="#25D366" />
-        <Cell label="Labor profit" value={fmtEGP(totals.laborProfit)} accent="#25D366" />
-        <Cell label="Invoice total" value={fmtEGP(totals.totalInvoice)} accent="#FFFFFF" />
-        <Cell label="Job cost" value={fmtEGP(totals.totalJobCost)} accent="#FFB020" />
-        <Cell label="Gross profit" value={fmtEGP(totals.grossProfit)} accent="#25D366" highlight />
-        <Cell label="Remaining" value={fmtEGP(totals.amountRemaining)} accent="#FFB020" />
+      {/* Internal financials (admin only — cost/profit) */}
+      <div>
+        <div className="text-[10px] uppercase tracking-widest text-white/40 mb-2 flex items-center gap-2">
+          <span>Internal financials (admin only)</span>
+          <span className="h-px flex-1 bg-white/5" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-white/10 border border-white/10">
+          <Cell label="Parts cost"   value={fmtEGP(totals.totalPartsCost)}    accent="#FFB020" />
+          <Cell label="Parts sales"  value={fmtEGP(totals.totalPartsSelling)} accent="#3B82F6" />
+          <Cell label="Parts profit" value={fmtEGP(totals.totalPartsProfit)}  accent="#25D366" />
+          <Cell label="Labor profit" value={fmtEGP(totals.laborProfit)}       accent="#25D366" />
+          <Cell label="Job cost"     value={fmtEGP(totals.totalJobCost)}      accent="#FFB020" />
+          <Cell label="Discount"     value={fmtEGP(totals.discount)}          accent="#FFFFFF" />
+          <Cell label="Gross profit" value={fmtEGP(totals.grossProfit)}       accent="#25D366" highlight />
+          <Cell label="Remaining"    value={fmtEGP(totals.amountRemaining)}   accent="#FFB020" />
+        </div>
       </div>
+
+      {/* Invoice section (customer-facing) */}
+      <InvoiceSection booking={booking}
+                      usedParts={myParts}
+                      totals={totals}
+                      paymentStatusOverride={derivePaymentStatus(Number(amountPaid) || 0, totals.totalInvoice)} />
 
       {/* Part modal */}
       <Modal open={!!partModal} onClose={closePartModal} wide
@@ -347,6 +368,87 @@ function Cell({ label, value, accent = '#FFFFFF', highlight }) {
     <div className={cx('bg-[#0A0A0A] px-3 py-3 flex flex-col gap-1', highlight && 'bg-[#E10600]/5')}>
       <span className="mono-font text-base leading-none" style={{ color: accent }}>{value}</span>
       <span className="text-[9px] uppercase tracking-widest text-white/40">{label}</span>
+    </div>
+  );
+}
+
+// ── Invoice section ───────────────────────────────────────────
+function InvoiceSection({ booking, usedParts, totals, paymentStatusOverride }) {
+  const invoiceNumber = getInvoiceNumber(booking);
+  const paymentStatus = paymentStatusOverride || booking.paymentStatus || 'unpaid';
+  const badge = PAYMENT_BADGE[paymentStatus] || PAYMENT_BADGE.unpaid;
+  // Snapshot booking with the latest in-progress financial state so the
+  // invoice always reflects what the admin sees — no need to wait for a
+  // re-fetch after Save.
+  const bookingForInvoice = {
+    ...booking,
+    paymentStatus,
+    laborSellingPrice: totals.laborSellingPrice,
+    discount: totals.discount,
+    amountPaid: totals.amountPaid,
+  };
+  const waLink = getInvoiceWhatsAppLink(bookingForInvoice, usedParts);
+
+  const handleView  = () => openInvoiceWindow(bookingForInvoice, usedParts, { autoPrint: false });
+  const handlePrint = () => openInvoiceWindow(bookingForInvoice, usedParts, { autoPrint: true });
+
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-widest text-white/40 mb-2 flex items-center gap-2">
+        <span>Invoice (customer-facing)</span>
+        <span className="h-px flex-1 bg-white/5" />
+      </div>
+      <div className="bg-black/40 border border-white/10 p-4 md:p-5">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+          <div className="min-w-0">
+            <div className="text-[10px] uppercase tracking-widest text-white/40">Invoice number</div>
+            <div className="mono-font text-base md:text-lg text-white mt-1">{invoiceNumber}</div>
+          </div>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] uppercase tracking-widest border self-start md:self-auto"
+                style={{ borderColor: `${badge.color}55`, color: badge.color }}>
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: badge.color }} />
+            {paymentStatus}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+          <InvCell label="Invoice total" value={fmtEGP(totals.totalInvoice)} />
+          <InvCell label="Amount paid"   value={fmtEGP(totals.amountPaid)}   color="#25D366" />
+          <InvCell label="Remaining"     value={fmtEGP(totals.amountRemaining)} color="#FFB020" />
+          <InvCell label="Items" value={`${usedParts.length} part${usedParts.length === 1 ? '' : 's'}${totals.laborSellingPrice > 0 ? ' + labor' : ''}`} />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button onClick={handleView}
+                  className="inline-flex items-center justify-center gap-2 h-9 px-3 border border-white/15 text-white/80 hover:border-[#E10600] hover:bg-[#E10600]/10 hover:text-white text-[11px] uppercase tracking-widest font-medium transition-all">
+            <FileText size={12} /> View invoice
+          </button>
+          {waLink ? (
+            <a href={waLink} target="_blank" rel="noopener noreferrer"
+               className="inline-flex items-center justify-center gap-2 h-9 px-3 bg-[#25D366] hover:bg-[#1ebd57] text-white text-[11px] uppercase tracking-widest font-bold transition-all">
+              <MessageCircle size={12} /> Send invoice via WhatsApp
+            </a>
+          ) : (
+            <button disabled title="No WhatsApp / phone number on file"
+                    className="inline-flex items-center justify-center gap-2 h-9 px-3 bg-white/5 text-white/30 text-[11px] uppercase tracking-widest font-bold cursor-not-allowed">
+              <MessageCircle size={12} /> Send invoice via WhatsApp
+            </button>
+          )}
+          <button onClick={handlePrint}
+                  className="inline-flex items-center justify-center gap-2 h-9 px-3 border border-white/15 text-white/80 hover:border-[#E10600] hover:bg-[#E10600]/10 hover:text-white text-[11px] uppercase tracking-widest font-medium transition-all">
+            <Printer size={12} /> Print invoice
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InvCell({ label, value, color }) {
+  return (
+    <div className="bg-black/30 border border-white/5 px-3 py-2.5">
+      <div className="text-[9px] uppercase tracking-widest text-white/40">{label}</div>
+      <div className="mono-font text-sm mt-1 truncate" style={{ color: color || '#FFFFFF' }}>{value}</div>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import React, { useMemo } from 'react';
 import { fmtEGP } from '@/lib/format';
 import { bookingJobTotals } from '@/lib/usedParts';
 import { isLowStock } from '@/lib/inventory';
-import { StatCard, SectionHeader } from './ui';
+import { StatCard, SectionHeader, cx } from './ui';
 
 function partsByBooking(usedParts) {
   const map = new Map();
@@ -16,7 +16,7 @@ function partsByBooking(usedParts) {
   return map;
 }
 
-export default function OverviewTab({ bookings, usedParts, inventory, expenses, salaries }) {
+export default function OverviewTab({ bookings, usedParts, inventory, expenses, salaries, onNavigate }) {
   const data = useMemo(() => {
     const byBooking = partsByBooking(usedParts);
     let totalRevenue = 0;
@@ -95,10 +95,32 @@ export default function OverviewTab({ bookings, usedParts, inventory, expenses, 
 
       {/* Bottom row */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-px bg-white/10 border-y border-white/10 mb-2">
-        <StatCard label="Net profit" value={fmtEGP(data.netProfit)} accent="#25D366" highlight
-                  hint="Gross profit − expenses − salaries" />
+        <StatCard
+          label="Net profit"
+          value={fmtEGP(data.netProfit)}
+          accent={data.netProfit > 0 ? '#25D366' : data.netProfit < 0 ? '#E10600' : '#FFFFFF'}
+          highlight
+          hint="Gross profit − expenses − salaries"
+        />
         <StatCard label="Unpaid amount" value={fmtEGP(data.totalUnpaid)} accent="#FFB020" />
-        <StatCard label="Low stock parts" value={data.lowStockCount} accent="#E10600" />
+        <button
+          type="button"
+          onClick={() => onNavigate?.('inventory', { lowStockOnly: true })}
+          className={cx(
+            'text-left bg-[#0A0A0A] px-4 md:px-5 py-5 md:py-6 flex flex-col gap-1.5 transition-colors',
+            'hover:bg-[#E10600]/5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#E10600]/40'
+          )}
+          aria-label="Open inventory with low-stock filter">
+          <span className="mono-font text-2xl md:text-3xl leading-none" style={{ color: '#E10600' }}>
+            {data.lowStockCount}
+          </span>
+          <span className="text-[10px] md:text-[11px] uppercase tracking-[0.2em] text-white/40">
+            Low stock parts
+          </span>
+          <span className="text-[10px] text-[#E10600] uppercase tracking-widest">
+            Open inventory →
+          </span>
+        </button>
       </div>
     </>
   );

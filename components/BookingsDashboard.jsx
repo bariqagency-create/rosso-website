@@ -158,6 +158,7 @@ const TABS = [
 
 function Dashboard({ onLogout }) {
   const [tab, setTab] = useState('overview');
+  const [inventoryInitialFilter, setInventoryInitialFilter] = useState(null);
   const [bookings, setBookings] = useState([]);
   const [usedParts, setUsedParts] = useState([]);
   const [inventory, setInventory] = useState([]);
@@ -165,6 +166,11 @@ function Dashboard({ onLogout }) {
   const [salaries, setSalaries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+
+  const navigate = useCallback((target, opts) => {
+    if (target === 'inventory') setInventoryInitialFilter(opts || null);
+    setTab(target);
+  }, []);
 
   const refresh = useCallback(async ({ silent } = {}) => {
     if (!silent) setLoading(true);
@@ -242,7 +248,7 @@ function Dashboard({ onLogout }) {
         </nav>
       </header>
 
-      <main className="max-w-[1400px] mx-auto px-4 md:px-10 py-8 md:py-12">
+      <main className="max-w-[1400px] mx-auto px-4 md:px-10 py-10 md:py-14">
         {loading && bookings.length === 0 && usedParts.length === 0 && inventory.length === 0 ? (
           <div className="bg-black/30 border border-white/10 px-6 py-14 text-center">
             <div className="inline-block w-6 h-6 border-2 border-white/15 border-t-[#E10600] rounded-full animate-spin mb-3" />
@@ -250,11 +256,11 @@ function Dashboard({ onLogout }) {
           </div>
         ) : (
           <>
-            {tab === 'overview'  && <OverviewTab  bookings={bookings} usedParts={usedParts} inventory={inventory} expenses={expenses} salaries={salaries} />}
+            {tab === 'overview'  && <OverviewTab  bookings={bookings} usedParts={usedParts} inventory={inventory} expenses={expenses} salaries={salaries} onNavigate={navigate} />}
             {tab === 'bookings'  && <BookingsTab  bookings={bookings} usedParts={usedParts} inventory={inventory}
                                                   refresh={() => refresh({ silent: true })}
                                                   loadError={loadError} supabaseConfigured={supabaseConfigured} />}
-            {tab === 'inventory' && <InventoryTab inventory={inventory} refresh={() => refresh({ silent: true })} />}
+            {tab === 'inventory' && <InventoryTab inventory={inventory} refresh={() => refresh({ silent: true })} initialFilter={inventoryInitialFilter} />}
             {tab === 'expenses'  && <ExpensesTab  expenses={expenses}   refresh={() => refresh({ silent: true })} />}
             {tab === 'salaries'  && <SalariesTab  salaries={salaries}   refresh={() => refresh({ silent: true })} />}
             {tab === 'reports'   && <ReportsTab   bookings={bookings} usedParts={usedParts} inventory={inventory} expenses={expenses} salaries={salaries} />}

@@ -5,7 +5,8 @@ import Link from 'next/link';
 import {
   ArrowLeft, Search, Phone, MessageCircle, Mail, MapPin, Calendar, Clock,
   Car, FileText, Trash2, Download, ChevronDown, Check, Copy, ExternalLink,
-  LayoutDashboard, AlertTriangle, Filter, X, FileSpreadsheet, FileJson
+  LayoutDashboard, AlertTriangle, Filter, X, FileSpreadsheet, FileJson,
+  Lock, LogOut, Eye, EyeOff
 } from 'lucide-react';
 import {
   getBookings, updateBookingStatus, deleteBooking, formatBookingMessage, STATUSES
@@ -77,8 +78,146 @@ function downloadFile(content, filename, mime) {
   URL.revokeObjectURL(url);
 }
 
-// ── Main component ────────────────────────────────────────────
+// ── Auth gate ─────────────────────────────────────────────────
+const SESSION_AUTH_KEY = 'rosso_dashboard_auth';
+const DASHBOARD_PASSWORD = process.env.NEXT_PUBLIC_DASHBOARD_PASSWORD;
+
 export default function BookingsDashboard() {
+  const [unlocked, setUnlocked] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined' && window.sessionStorage.getItem(SESSION_AUTH_KEY) === '1') {
+        setUnlocked(true);
+      }
+    } catch {}
+    setAuthChecked(true);
+  }, []);
+
+  const onUnlock = () => {
+    try { window.sessionStorage.setItem(SESSION_AUTH_KEY, '1'); } catch {}
+    setUnlocked(true);
+  };
+
+  const onLogout = () => {
+    try { window.sessionStorage.removeItem(SESSION_AUTH_KEY); } catch {}
+    setUnlocked(false);
+  };
+
+  if (!authChecked) return null;
+  if (!unlocked) return <PasswordScreen onUnlock={onUnlock} />;
+  return <Dashboard onLogout={onLogout} />;
+}
+
+// ── Password screen ───────────────────────────────────────────
+function PasswordScreen({ onUnlock }) {
+  const [value, setValue] = useState('');
+  const [error, setError] = useState('');
+  const [show, setShow] = useState(false);
+
+  const missingEnv = !DASHBOARD_PASSWORD;
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (missingEnv) return;
+    if (value === DASHBOARD_PASSWORD) {
+      setError('');
+      onUnlock();
+    } else {
+      setError('Incorrect password.');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0A0A0A] text-white flex items-center justify-center px-5"
+         style={{ fontFamily: "'Archivo', sans-serif" }}>
+      <div className="w-full max-w-md">
+        <Link href="/" className="inline-flex items-center gap-2 text-white/50 hover:text-white text-xs uppercase tracking-[0.2em] mb-8 group">
+          <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
+          Back to site
+        </Link>
+
+        <div className="relative bg-gradient-to-br from-[#141414] to-[#0A0A0A] border border-white/10 p-8 md:p-10">
+          <div className="absolute top-0 left-0 w-10 h-10 border-t-2 border-l-2 border-[#E10600]" />
+          <div className="absolute top-0 right-0 w-10 h-10 border-t-2 border-r-2 border-[#E10600]" />
+          <div className="absolute bottom-0 left-0 w-10 h-10 border-b-2 border-l-2 border-[#E10600]" />
+          <div className="absolute bottom-0 right-0 w-10 h-10 border-b-2 border-r-2 border-[#E10600]" />
+
+          <div className="flex flex-col items-center text-center mb-7">
+            <div className="w-14 h-14 bg-[#E10600]/10 border border-[#E10600]/40 flex items-center justify-center mb-5">
+              <Lock size={22} className="text-[#E10600]" />
+            </div>
+            <span className="text-[10px] uppercase tracking-[0.4em] text-[#E10600] font-bold">— PROTECTED</span>
+            <h1 className="display-font text-2xl md:text-3xl uppercase mt-3 leading-tight">Dashboard Access</h1>
+            <p className="text-white/50 text-sm mt-2 max-w-xs">Enter the password to view bookings.</p>
+          </div>
+
+          {missingEnv ? (
+            <div className="flex items-start gap-3 px-4 py-3 bg-[#E10600]/10 border border-[#E10600]/40 text-sm text-white/90">
+              <AlertTriangle size={16} className="text-[#E10600] shrink-0 mt-0.5" />
+              <div>
+                <div className="font-bold mb-1">Configuration error</div>
+                <div className="text-white/70 text-xs leading-relaxed">
+                  <code className="mono-font text-[#E10600]">NEXT_PUBLIC_DASHBOARD_PASSWORD</code> is not set.
+                  Add it to your environment variables (e.g. <code className="mono-font">.env.local</code> or your Vercel project settings) and redeploy.
+                </div>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <label className="block">
+                <span className="text-[10px] uppercase tracking-widest text-white/50 mb-2 block">Password</span>
+                <div className="relative">
+                  <input
+                    type={show ? 'text' : 'password'}
+                    value={value}
+                    onChange={(e) => { setValue(e.target.value); if (error) setError(''); }}
+                    autoFocus
+                    autoComplete="current-password"
+                    className="w-full bg-black/40 border border-white/10 focus:border-[#E10600] outline-none py-3 pl-4 pr-11 text-sm placeholder-white/30 transition-colors"
+                    placeholder="••••••••"
+                    aria-invalid={!!error || undefined}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShow(s => !s)}
+                    tabIndex={-1}
+                    aria-label={show ? 'Hide password' : 'Show password'}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center text-white/40 hover:text-white transition-colors">
+                    {show ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </label>
+
+              {error && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-[#E10600]/10 border border-[#E10600]/40 text-xs text-white/90">
+                  <AlertTriangle size={12} className="text-[#E10600] shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={value.length === 0}
+                className="w-full py-3.5 bg-[#E10600] hover:bg-[#FF1A0F] disabled:bg-white/10 disabled:text-white/30 disabled:cursor-not-allowed text-white text-xs uppercase tracking-widest font-bold transition-all flex items-center justify-center gap-2">
+                <Lock size={12} />
+                Unlock dashboard
+              </button>
+            </form>
+          )}
+        </div>
+
+        <p className="text-center text-[10px] uppercase tracking-widest text-white/30 mt-6">
+          Access is remembered for this browser session.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ── Main component ────────────────────────────────────────────
+function Dashboard({ onLogout }) {
   const [bookings, setBookings] = useState([]);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -192,6 +331,7 @@ export default function BookingsDashboard() {
             <span>Bookings</span>
           </div>
 
+          <div className="flex items-center gap-2">
           {/* Export dropdown */}
           <div className="relative" onClick={(e) => e.stopPropagation()}>
             <button
@@ -222,6 +362,17 @@ export default function BookingsDashboard() {
                 </button>
               </div>
             )}
+          </div>
+
+          {/* Logout */}
+          <button
+            onClick={onLogout}
+            title="Log out"
+            aria-label="Log out"
+            className="inline-flex items-center gap-2 px-3 md:px-4 py-2 border border-white/15 hover:border-[#E10600] hover:bg-[#E10600]/10 hover:text-[#E10600] text-xs uppercase tracking-widest transition-all">
+            <LogOut size={12} />
+            <span className="hidden sm:inline">Logout</span>
+          </button>
           </div>
         </div>
       </header>

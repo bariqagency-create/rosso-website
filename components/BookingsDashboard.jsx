@@ -9,7 +9,8 @@ import {
   Lock, LogOut, Eye, EyeOff
 } from 'lucide-react';
 import {
-  getBookings, updateBookingStatus, deleteBooking, formatBookingMessage, STATUSES
+  getBookings, updateBookingStatus, deleteBooking, formatBookingMessage,
+  getLocalBookings, supabaseConfigured, STATUSES
 } from '@/lib/bookings';
 
 const STATUS_STYLES = {
@@ -219,6 +220,8 @@ function PasswordScreen({ onUnlock }) {
 // ── Main component ────────────────────────────────────────────
 function Dashboard({ onLogout }) {
   const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState(''); // YYYY-MM-DD or ''
@@ -227,16 +230,27 @@ function Dashboard({ onLogout }) {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [exportOpen, setExportOpen] = useState(false);
 
-  useEffect(() => {
-    const refresh = () => setBookings(getBookings());
-    refresh();
-    window.addEventListener('storage', refresh);
-    window.addEventListener('rosso:bookings-changed', refresh);
-    return () => {
-      window.removeEventListener('storage', refresh);
-      window.removeEventListener('rosso:bookings-changed', refresh);
-    };
+  const refresh = React.useCallback(async ({ silent } = {}) => {
+    if (!silent) setLoading(true);
+    try {
+      const list = await getBookings();
+      setBookings(list);
+      setLoadError('');
+    } catch (e) {
+      setLoadError(e?.message || 'Failed to load bookings.');
+      // Soft fallback to local mirror so the dashboard isn't blank
+      try { setBookings(getLocalBookings()); } catch {}
+    } finally {
+      if (!silent) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    refresh();
+    const onChange = () => refresh({ silent: true });
+    window.addEventListener('rosso:bookings-changed', onChange);
+    return () => window.removeEventListener('rosso:bookings-changed', onChange);
+  }, [refresh]);
 
   // Close export dropdown when clicking outside
   useEffect(() => {
@@ -284,16 +298,30 @@ function Dashboard({ onLogout }) {
 
   const activeFilters = (statusFilter !== 'all') || datePreset !== 'all' || !!query;
 
-  const onStatusChange = (id, status) => {
-    updateBookingStatus(id, status);
-    setBookings(getBookings());
+  const onStatusChange = async (id, status) => {
+    // Optimistic update
+    setBookings(prev => prev.map(b => (b.id === id ? { ...b, status } : b)));
+    try {
+      await updateBookingStatus(id, status);
+      refresh({ silent: true });
+    } catch (e) {
+      setLoadError(e?.message || 'Failed to update status.');
+      refresh({ silent: true });
+    }
   };
 
-  const onDelete = (id) => {
-    deleteBooking(id);
-    setBookings(getBookings());
+  const onDelete = async (id) => {
     setConfirmDelete(null);
     if (expanded === id) setExpanded(null);
+    // Optimistic
+    setBookings(prev => prev.filter(b => b.id !== id));
+    try {
+      await deleteBooking(id);
+      refresh({ silent: true });
+    } catch (e) {
+      setLoadError(e?.message || 'Failed to delete booking.');
+      refresh({ silent: true });
+    }
   };
 
   const clearFilters = () => {
@@ -498,8 +526,30 @@ function Dashboard({ onLogout }) {
           </div>
         </div>
 
+        {/* Connection / load error */}
+        {loadError && (
+          <div className="mb-4 flex items-start gap-3 px-4 py-3 bg-[#E10600]/10 border border-[#E10600]/40 text-sm text-white/90">
+            <AlertTriangle size={16} className="text-[#E10600] shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <div className="font-bold mb-1">Could not reach the database</div>
+              <div className="text-white/70 text-xs">{loadError}</div>
+              {!supabaseConfigured && (
+                <div className="text-white/60 text-xs mt-1">
+                  Supabase is not configured — set <code className="mono-font">NEXT_PUBLIC_SUPABASE_URL</code> and <code className="mono-font">NEXT_PUBLIC_SUPABASE_ANON_KEY</code>.
+                </div>
+              )}
+            </div>
+            <button onClick={() => refresh()}
+                    className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 border border-[#E10600]/40 hover:border-[#E10600] hover:bg-[#E10600]/20 text-[10px] uppercase tracking-widest transition-all">
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* List */}
-        {bookings.length === 0 ? (
+        {loading && bookings.length === 0 ? (
+          <LoadingState />
+        ) : bookings.length === 0 ? (
           <EmptyState />
         ) : filtered.length === 0 ? (
           <NoResults onClear={clearFilters} />
@@ -578,6 +628,15 @@ function FilterChip({ active, onClick, children, dot }) {
       {dot && <span className="w-1.5 h-1.5 rounded-full" style={{ background: dot }} />}
       {children}
     </button>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className="bg-black/30 border border-white/10 px-6 py-14 text-center">
+      <div className="inline-block w-6 h-6 border-2 border-white/15 border-t-[#E10600] rounded-full animate-spin mb-3" />
+      <p className="text-white/50 text-xs uppercase tracking-widest">Loading bookings…</p>
+    </div>
   );
 }
 

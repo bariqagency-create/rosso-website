@@ -663,6 +663,7 @@ function BookingSection({ t, lang, isRTL }) {
   const [confirmation, setConfirmation] = useState(null); // saved booking record
   const [draftRestored, setDraftRestored] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const totalSteps = 7;
   const today = new Date().toISOString().split('T')[0];
@@ -727,19 +728,29 @@ function BookingSection({ t, lang, isRTL }) {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!canProceed()) { setShowErrors(true); return; }
     setSubmitting(true);
+    setSubmitError('');
 
-    const record = saveBooking(data, { lang });
-    const message = encodeURIComponent(formatBookingMessage(record, lang === 'ar'));
-
-    setTimeout(() => {
-      try { window.open(`${BUSINESS.whatsappUrl}?text=${message}`, '_blank'); } catch {}
-      clearDraft();
+    let record;
+    try {
+      record = await saveBooking(data, { lang });
+    } catch (e) {
       setSubmitting(false);
-      setConfirmation(record);
-    }, 600);
+      setSubmitError(
+        (lang === 'ar' ? 'تعذر حفظ الحجز: ' : 'Could not save booking: ') +
+        (e?.message || (lang === 'ar' ? 'حاول مرة أخرى.' : 'please try again.'))
+      );
+      // Form state is preserved — user can retry.
+      return;
+    }
+
+    const message = encodeURIComponent(formatBookingMessage(record, lang === 'ar'));
+    try { window.open(`${BUSINESS.whatsappUrl}?text=${message}`, '_blank'); } catch {}
+    clearDraft();
+    setSubmitting(false);
+    setConfirmation(record);
   };
 
   const startNew = () => {
@@ -894,6 +905,14 @@ function BookingSection({ t, lang, isRTL }) {
           <div className="mt-4 flex items-center gap-2 px-4 py-3 bg-[#E10600]/10 border border-[#E10600]/40 text-sm text-white/90 anim-fade-up">
             <AlertTriangle size={14} className="text-[#E10600] shrink-0" />
             <span>{currentError}</span>
+          </div>
+        )}
+
+        {/* Submit error (Supabase save failure) */}
+        {submitError && (
+          <div className="mt-4 flex items-start gap-2 px-4 py-3 bg-[#E10600]/10 border border-[#E10600]/40 text-sm text-white/90 anim-fade-up">
+            <AlertTriangle size={14} className="text-[#E10600] shrink-0 mt-0.5" />
+            <span>{submitError}</span>
           </div>
         )}
 

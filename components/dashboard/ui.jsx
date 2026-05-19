@@ -6,15 +6,23 @@ import { X, AlertTriangle, Check } from 'lucide-react';
 export const cx = (...c) => c.filter(Boolean).join(' ');
 
 // ── Stat card ─────────────────────────────────────────────────
+// Uses clamp() so big EGP values (e.g. "EGP 1,234,567") shrink on small cards
+// rather than overflow. Padding + label sizing also reduces on mobile.
 export function StatCard({ label, value, accent = '#FFFFFF', highlight, hint }) {
   return (
     <div className={cx(
-      'bg-[#0A0A0A] px-4 md:px-5 py-5 md:py-6 flex flex-col gap-1.5 transition-colors',
+      'bg-[#0A0A0A] px-3 md:px-5 py-4 md:py-6 flex flex-col gap-1 md:gap-1.5 transition-colors overflow-hidden',
       highlight ? 'bg-[#E10600]/5' : 'hover:bg-white/[0.02]'
     )}>
-      <span className="mono-font text-2xl md:text-3xl leading-none" style={{ color: accent }}>{value}</span>
-      <span className="text-[10px] md:text-[11px] uppercase tracking-[0.2em] text-white/40">{label}</span>
-      {hint && <span className="text-[10px] text-white/30">{hint}</span>}
+      <span
+        className="mono-font leading-none break-words"
+        style={{ color: accent, fontSize: 'clamp(1.05rem, 4vw, 1.85rem)' }}
+        title={typeof value === 'string' ? value : undefined}
+      >
+        {value}
+      </span>
+      <span className="text-[10px] md:text-[11px] uppercase tracking-[0.18em] text-white/40 truncate">{label}</span>
+      {hint && <span className="text-[10px] text-white/30 hidden md:inline">{hint}</span>}
     </div>
   );
 }

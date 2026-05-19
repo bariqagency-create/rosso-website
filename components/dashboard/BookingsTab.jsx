@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import {
   formatBookingMessage, updateBookingStatus, deleteBooking,
-  ALL_STATUSES, PAYMENT_STATUSES,
+  STATUSES, PAYMENT_STATUSES, STATUS_LABELS, normalizeStatus,
 } from '@/lib/bookings';
 import { bookingJobTotals } from '@/lib/usedParts';
 import { fmtEGP, isoToday } from '@/lib/format';
@@ -18,18 +18,15 @@ import {
 } from './ui';
 import JobCostPanel from './JobCostPanel';
 
+// Canonical statuses only. Legacy DB values are normalized to one of these on read.
 const STATUS_STYLES = {
-  // Workflow
-  new:            { label: 'New',           dot: '#FFB020', bg: 'bg-[#FFB020]/10', text: 'text-[#FFB020]', border: 'border-[#FFB020]/40' },
-  in_progress:    { label: 'In progress',   dot: '#3B82F6', bg: 'bg-[#3B82F6]/10', text: 'text-[#3B82F6]', border: 'border-[#3B82F6]/40' },
-  waiting_parts:  { label: 'Waiting parts', dot: '#A855F7', bg: 'bg-[#A855F7]/10', text: 'text-[#A855F7]', border: 'border-[#A855F7]/40' },
-  ready:          { label: 'Ready',         dot: '#25D366', bg: 'bg-[#25D366]/10', text: 'text-[#25D366]', border: 'border-[#25D366]/40' },
-  delivered:      { label: 'Delivered',     dot: '#FFFFFF', bg: 'bg-white/5',      text: 'text-white',     border: 'border-white/20' },
-  cancelled:      { label: 'Cancelled',     dot: '#E10600', bg: 'bg-[#E10600]/10', text: 'text-[#E10600]', border: 'border-[#E10600]/40' },
-  // Legacy
-  pending:        { label: 'Pending',       dot: '#FFB020', bg: 'bg-[#FFB020]/10', text: 'text-[#FFB020]', border: 'border-[#FFB020]/40' },
-  confirmed:      { label: 'Confirmed',     dot: '#3B82F6', bg: 'bg-[#3B82F6]/10', text: 'text-[#3B82F6]', border: 'border-[#3B82F6]/40' },
-  completed:      { label: 'Completed',     dot: '#25D366', bg: 'bg-[#25D366]/10', text: 'text-[#25D366]', border: 'border-[#25D366]/40' },
+  new:           { label: STATUS_LABELS.new,            dot: '#FFB020', bg: 'bg-[#FFB020]/10', text: 'text-[#FFB020]', border: 'border-[#FFB020]/40' },
+  confirmed:     { label: STATUS_LABELS.confirmed,      dot: '#06B6D4', bg: 'bg-[#06B6D4]/10', text: 'text-[#06B6D4]', border: 'border-[#06B6D4]/40' },
+  in_progress:   { label: STATUS_LABELS.in_progress,    dot: '#3B82F6', bg: 'bg-[#3B82F6]/10', text: 'text-[#3B82F6]', border: 'border-[#3B82F6]/40' },
+  waiting_parts: { label: STATUS_LABELS.waiting_parts,  dot: '#A855F7', bg: 'bg-[#A855F7]/10', text: 'text-[#A855F7]', border: 'border-[#A855F7]/40' },
+  ready:         { label: STATUS_LABELS.ready,          dot: '#25D366', bg: 'bg-[#25D366]/10', text: 'text-[#25D366]', border: 'border-[#25D366]/40' },
+  delivered:     { label: STATUS_LABELS.delivered,      dot: '#FFFFFF', bg: 'bg-white/10',     text: 'text-white',     border: 'border-white/30' },
+  cancelled:     { label: STATUS_LABELS.cancelled,      dot: '#E10600', bg: 'bg-[#E10600]/10', text: 'text-[#E10600]', border: 'border-[#E10600]/40' },
 };
 
 const PAYMENT_STATUS_COLORS = {
@@ -259,7 +256,7 @@ export default function BookingsTab({ bookings, usedParts, inventory, refresh, l
             <div className="text-[10px] uppercase tracking-widest text-white/40 mb-1.5">Status</div>
             <div className="flex flex-wrap gap-1.5">
               <Chip active={statusFilter === 'all'} onClick={() => setStatusFilter('all')}>All</Chip>
-              {ALL_STATUSES.map(s => (
+              {STATUSES.map(s => (
                 <Chip key={s} active={statusFilter === s} onClick={() => setStatusFilter(s)} dot={STATUS_STYLES[s]?.dot}>
                   {STATUS_STYLES[s]?.label || s}
                 </Chip>
@@ -431,56 +428,48 @@ function BookingCard({ booking, inventory, usedParts, refresh, expanded, onToggl
 
       {expanded && (
         <div className="border-t border-white/5 px-4 md:px-6 py-5 md:py-7 anim-fade-up space-y-7">
-          {/* Quick actions */}
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Customer actions */}
+          <ActionGroup label="Customer actions">
             {phoneDigits && (
-              <a href={`tel:${booking.phone || d.phone}`} onClick={(e) => e.stopPropagation()}
-                 className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 hover:border-[#E10600] hover:bg-[#E10600]/10 text-[11px] uppercase tracking-widest transition-all">
-                <Phone size={12} /> Call
-              </a>
+              <ActionButton href={`tel:${booking.phone || d.phone}`} icon={<Phone size={12} />} label="Call" />
             )}
             {whatsappLink && (
-              <a href={whatsappLink} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
-                 className="inline-flex items-center gap-2 px-3 py-2 bg-[#25D366] hover:bg-[#1ebd57] text-white text-[11px] uppercase tracking-widest font-bold transition-all">
-                <MessageCircle size={12} /> WhatsApp
-              </a>
+              <ActionButton href={whatsappLink} icon={<MessageCircle size={12} />} label="WhatsApp"
+                            external variant="whatsapp" />
             )}
             {d.email && (
-              <a href={`mailto:${d.email}`} onClick={(e) => e.stopPropagation()}
-                 className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 hover:border-[#E10600] hover:bg-[#E10600]/10 text-[11px] uppercase tracking-widest transition-all">
-                <Mail size={12} /> Email
-              </a>
+              <ActionButton href={`mailto:${d.email}`} icon={<Mail size={12} />} label="Email" />
             )}
             {d.mapsLink && (
-              <a href={d.mapsLink} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
-                 className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 hover:border-[#E10600] hover:bg-[#E10600]/10 text-[11px] uppercase tracking-widest transition-all">
-                <MapPin size={12} /> Map
-              </a>
+              <ActionButton href={d.mapsLink} icon={<MapPin size={12} />} label="Map" external />
             )}
-            <button onClick={copyRef}
-                    className="inline-flex items-center gap-2 px-3 py-2 border border-white/15 hover:border-[#E10600] hover:bg-[#E10600]/10 text-[11px] uppercase tracking-widest transition-all">
-              {copied ? <Check size={12} /> : <Copy size={12} />} {copied ? 'Copied' : 'Copy ref'}
-            </button>
-            <div className="flex-1" />
-            <button onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                    className="inline-flex items-center gap-2 px-3 py-2 border border-white/10 hover:border-[#E10600] hover:bg-[#E10600]/10 hover:text-[#E10600] text-white/50 text-[11px] uppercase tracking-widest transition-all">
-              <Trash2 size={12} /> Delete
-            </button>
-          </div>
+            <ActionButton onClick={copyRef} icon={copied ? <Check size={12} /> : <Copy size={12} />}
+                          label={copied ? 'Copied' : 'Copy ref'} />
+          </ActionGroup>
 
-          {/* Status switcher */}
+          {/* Status switcher — clean responsive grid, consistent button sizing */}
           <div>
-            <div className="text-[10px] uppercase tracking-widest text-white/40 mb-2">Job status</div>
-            <div className="flex flex-wrap gap-1.5">
-              {Object.keys(STATUS_STYLES).map(st => {
+            <div className="text-[10px] uppercase tracking-widest text-white/40 mb-2 flex items-center gap-2">
+              <span>Job status</span>
+              <span className="h-px flex-1 bg-white/5" />
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5">
+              {STATUSES.map(st => {
                 const ss = STATUS_STYLES[st];
                 const active = booking.status === st;
+                const danger = st === 'cancelled';
                 return (
                   <button key={st} onClick={(e) => { e.stopPropagation(); onStatusChange(st); }}
-                          className={cx('inline-flex items-center gap-2 px-3 py-2 text-[11px] uppercase tracking-widest border transition-all',
-                            active ? cx(ss.bg, ss.text, ss.border) : 'border-white/10 text-white/50 hover:border-white/25 hover:text-white')}>
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: ss.dot }} />
-                    {ss.label}
+                          className={cx(
+                            'h-9 inline-flex items-center justify-center gap-2 px-2.5 text-[10px] uppercase tracking-widest border transition-all',
+                            active
+                              ? cx(ss.bg, ss.text, ss.border, 'font-bold')
+                              : danger
+                                ? 'border-white/10 text-white/40 hover:border-[#E10600]/60 hover:bg-[#E10600]/10 hover:text-[#E10600]'
+                                : 'border-white/10 text-white/55 hover:border-white/30 hover:text-white'
+                          )}>
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: ss.dot }} />
+                    <span className="truncate">{ss.label}</span>
                   </button>
                 );
               })}
@@ -522,15 +511,60 @@ function BookingCard({ booking, inventory, usedParts, refresh, expanded, onToggl
           <div className="border-t border-[#E10600]/30 pt-6">
             <div className="flex items-center gap-2 mb-4 text-[11px] uppercase tracking-widest text-[#E10600] font-bold">
               <Wrench size={12} />
-              Job cost
+              Job cost &amp; invoice
             </div>
             <JobCostPanel booking={booking} usedParts={usedParts} inventory={inventory} refresh={refresh} />
+          </div>
+
+          {/* Danger zone */}
+          <div className="pt-4 border-t border-white/5">
+            <div className="text-[10px] uppercase tracking-widest text-white/40 mb-2">Danger zone</div>
+            <button onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                    className="inline-flex items-center gap-2 h-9 px-3 border border-[#E10600]/40 text-[#E10600] hover:bg-[#E10600] hover:text-white text-[11px] uppercase tracking-widest font-bold transition-all">
+              <Trash2 size={12} /> Delete booking
+            </button>
           </div>
         </div>
       )}
     </div>
   );
 }
+
+// Consistent action button — used inside grouped action rows.
+function ActionButton({ href, onClick, icon, label, variant = 'default', external }) {
+  const cls = variant === 'whatsapp'
+    ? 'bg-[#25D366] hover:bg-[#1ebd57] text-white border border-[#25D366]'
+    : variant === 'primary'
+      ? 'bg-[#E10600] hover:bg-[#FF1A0F] text-white border border-[#E10600]'
+      : 'border border-white/15 text-white/80 hover:border-[#E10600] hover:bg-[#E10600]/10 hover:text-white';
+  const common = cx('inline-flex items-center justify-center gap-2 h-9 px-3 text-[11px] uppercase tracking-widest font-medium transition-all', cls);
+  if (href) {
+    return (
+      <a href={href} target={external ? '_blank' : undefined} rel={external ? 'noopener noreferrer' : undefined}
+         onClick={(e) => e.stopPropagation()} className={common}>
+        {icon} <span className="hidden xs:inline">{label}</span><span className="xs:hidden">{label}</span>
+      </a>
+    );
+  }
+  return (
+    <button onClick={(e) => { e.stopPropagation(); onClick?.(e); }} className={common}>
+      {icon} {label}
+    </button>
+  );
+}
+
+function ActionGroup({ label, children }) {
+  return (
+    <div>
+      <div className="text-[10px] uppercase tracking-widest text-white/40 mb-2 flex items-center gap-2">
+        <span>{label}</span>
+        <span className="h-px flex-1 bg-white/5" />
+      </div>
+      <div className="flex flex-wrap gap-2">{children}</div>
+    </div>
+  );
+}
+export { ActionButton, ActionGroup };
 
 function Chip({ active, onClick, children, dot }) {
   return (

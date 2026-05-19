@@ -18,10 +18,15 @@ const empty = {
   minimumStock: 0, supplier: '', shelfLocation: '', notes: '',
 };
 
-export default function InventoryTab({ inventory, refresh }) {
+export default function InventoryTab({ inventory, refresh, initialFilter }) {
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
-  const [onlyLow, setOnlyLow] = useState(false);
+  const [onlyLow, setOnlyLow] = useState(!!initialFilter?.lowStockOnly);
+
+  // Honour a low-stock navigation request from elsewhere (Overview card).
+  React.useEffect(() => {
+    if (initialFilter?.lowStockOnly) setOnlyLow(true);
+  }, [initialFilter]);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(empty);
   const [error, setError] = useState('');
@@ -164,7 +169,8 @@ export default function InventoryTab({ inventory, refresh }) {
             </thead>
             <tbody>
               {filtered.map(p => {
-                const low = isLowStock(p);
+                const out = Number(p.quantityAvailable) <= 0;
+                const low = !out && isLowStock(p);
                 return (
                   <tr key={p.id} className="border-t border-white/5 hover:bg-white/[0.02]">
                     <td className="px-4 py-3">
@@ -181,9 +187,10 @@ export default function InventoryTab({ inventory, refresh }) {
                         {p.type}
                       </span>
                     </td>
-                    <td className={cx('px-4 py-3 text-right mono-font', low && 'text-[#E10600]')}>
+                    <td className={cx('px-4 py-3 text-right mono-font', (low || out) && 'text-[#E10600]')}>
                       {p.quantityAvailable}
-                      {low && <div className="text-[10px] text-[#E10600] uppercase tracking-widest mt-0.5">Low</div>}
+                      {out && <div className="text-[10px] text-[#E10600] uppercase tracking-widest mt-0.5">Out of stock</div>}
+                      {low && <div className="text-[10px] text-[#E10600] uppercase tracking-widest mt-0.5">Low stock</div>}
                     </td>
                     <td className="px-4 py-3 text-right text-white/80 mono-font text-xs">{fmtEGP(p.costPrice)}</td>
                     <td className="px-4 py-3 text-right text-white/80 mono-font text-xs">{fmtEGP(p.sellingPrice)}</td>

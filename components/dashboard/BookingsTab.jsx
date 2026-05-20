@@ -18,15 +18,15 @@ import {
 } from './ui';
 import JobCostPanel from './JobCostPanel';
 
-// Canonical statuses only. Legacy DB values are normalized to one of these on read.
+// Canonical statuses only. Legacy DB values (pending/confirmed/completed) are
+// normalized to one of these by `normalizeStatus()` on read.
 const STATUS_STYLES = {
-  new:           { label: STATUS_LABELS.new,            dot: '#FFB020', bg: 'bg-[#FFB020]/10', text: 'text-[#FFB020]', border: 'border-[#FFB020]/40' },
-  confirmed:     { label: STATUS_LABELS.confirmed,      dot: '#06B6D4', bg: 'bg-[#06B6D4]/10', text: 'text-[#06B6D4]', border: 'border-[#06B6D4]/40' },
-  in_progress:   { label: STATUS_LABELS.in_progress,    dot: '#3B82F6', bg: 'bg-[#3B82F6]/10', text: 'text-[#3B82F6]', border: 'border-[#3B82F6]/40' },
-  waiting_parts: { label: STATUS_LABELS.waiting_parts,  dot: '#A855F7', bg: 'bg-[#A855F7]/10', text: 'text-[#A855F7]', border: 'border-[#A855F7]/40' },
-  ready:         { label: STATUS_LABELS.ready,          dot: '#25D366', bg: 'bg-[#25D366]/10', text: 'text-[#25D366]', border: 'border-[#25D366]/40' },
-  delivered:     { label: STATUS_LABELS.delivered,      dot: '#FFFFFF', bg: 'bg-white/10',     text: 'text-white',     border: 'border-white/30' },
-  cancelled:     { label: STATUS_LABELS.cancelled,      dot: '#E10600', bg: 'bg-[#E10600]/10', text: 'text-[#E10600]', border: 'border-[#E10600]/40' },
+  new:           { label: STATUS_LABELS.new,           dot: '#FFB020', bg: 'bg-[#FFB020]/10', text: 'text-[#FFB020]', border: 'border-[#FFB020]/40' },
+  in_progress:   { label: STATUS_LABELS.in_progress,   dot: '#3B82F6', bg: 'bg-[#3B82F6]/10', text: 'text-[#3B82F6]', border: 'border-[#3B82F6]/40' },
+  waiting_parts: { label: STATUS_LABELS.waiting_parts, dot: '#A855F7', bg: 'bg-[#A855F7]/10', text: 'text-[#A855F7]', border: 'border-[#A855F7]/40' },
+  ready:         { label: STATUS_LABELS.ready,         dot: '#25D366', bg: 'bg-[#25D366]/10', text: 'text-[#25D366]', border: 'border-[#25D366]/40' },
+  delivered:     { label: STATUS_LABELS.delivered,     dot: '#FFFFFF', bg: 'bg-white/10',     text: 'text-white',     border: 'border-white/30' },
+  cancelled:     { label: STATUS_LABELS.cancelled,     dot: '#E10600', bg: 'bg-[#E10600]/10', text: 'text-[#E10600]', border: 'border-[#E10600]/40' },
 };
 
 const PAYMENT_STATUS_COLORS = {
@@ -373,6 +373,11 @@ function BookingCard({ booking, inventory, usedParts, refresh, expanded, onToggl
           <div className="flex items-center justify-between gap-3 mb-1.5">
             <div className="flex items-center gap-2 min-w-0">
               <span className="mono-font text-[11px] text-[#E10600] truncate">{booking.id}</span>
+              {booking.data?.source === 'manual' && (
+                <span className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 border border-[#06B6D4]/50 text-[#06B6D4] shrink-0">
+                  Manual
+                </span>
+              )}
               <span className="hidden sm:inline text-[10px] uppercase tracking-widest text-white/30">
                 · {createdAt.toLocaleDateString()}
               </span>
@@ -453,7 +458,7 @@ function BookingCard({ booking, inventory, usedParts, refresh, expanded, onToggl
               <span>Job status</span>
               <span className="h-px flex-1 bg-white/5" />
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5">
               {STATUSES.map(st => {
                 const ss = STATUS_STYLES[st];
                 const active = booking.status === st;

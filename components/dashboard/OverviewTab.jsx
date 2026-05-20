@@ -71,7 +71,8 @@ export default function OverviewTab({ bookings, usedParts, inventory, expenses, 
       <SectionHeader eyebrow="OVERVIEW" title="Service Center Snapshot"
                      subtitle="All numbers update automatically as bookings, parts, expenses, and payments change." />
 
-      {/* Job status row */}
+      {/* ── Operations ─────────────────────────────────────── */}
+      <GroupLabel>Operations</GroupLabel>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-px bg-white/10 border-y border-white/10 mb-6">
         <StatCard label="Total bookings" value={data.totalBookings} accent="#FFFFFF" />
         <StatCard label="New" value={data.statusCount.new || 0} accent="#FFB020" />
@@ -81,20 +82,19 @@ export default function OverviewTab({ bookings, usedParts, inventory, expenses, 
         <StatCard label="Delivered" value={data.statusCount.delivered || 0} accent="#FFFFFF" />
       </div>
 
-      {/* Financial row */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-px bg-white/10 border-y border-white/10 mb-6">
+      {/* ── Financials ─────────────────────────────────────── */}
+      <GroupLabel>Financials</GroupLabel>
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-px bg-white/10 border-y border-white/10 mb-3">
         <StatCard label="Revenue" value={fmtEGP(data.totalRevenue)} accent="#FFFFFF" />
-        <StatCard label="Parts cost" value={fmtEGP(data.totalPartsCost)} accent="#FFB020" />
         <StatCard label="Parts sales" value={fmtEGP(data.totalPartsSelling)} accent="#3B82F6" />
+        <StatCard label="Parts cost" value={fmtEGP(data.totalPartsCost)} accent="#FFB020" />
         <StatCard label="Parts profit" value={fmtEGP(data.totalPartsProfit)} accent="#25D366" />
         <StatCard label="Labor revenue" value={fmtEGP(data.totalLaborRevenue)} accent="#25D366" />
         <StatCard label="Gross profit" value={fmtEGP(data.grossProfit)} accent="#25D366" />
         <StatCard label="Expenses" value={fmtEGP(data.totalExpenses)} accent="#E10600" />
         <StatCard label="Salaries" value={fmtEGP(data.totalSalaries)} accent="#E10600" />
       </div>
-
-      {/* Bottom row */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-px bg-white/10 border-y border-white/10 mb-2">
+      <div className="grid grid-cols-1 gap-px bg-white/10 border-y border-white/10 mb-6">
         <StatCard
           label="Net profit"
           value={fmtEGP(data.netProfit)}
@@ -102,19 +102,24 @@ export default function OverviewTab({ bookings, usedParts, inventory, expenses, 
           highlight
           hint="Gross profit − expenses − salaries"
         />
+      </div>
+
+      {/* ── Alerts ─────────────────────────────────────────── */}
+      <GroupLabel>Alerts</GroupLabel>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-white/10 border-y border-white/10 mb-2">
         <StatCard label="Unpaid amount" value={fmtEGP(data.totalUnpaid)} accent="#FFB020" />
         <button
           type="button"
           onClick={() => onNavigate?.('inventory', { lowStockOnly: true })}
           className={cx(
-            'text-left bg-[#0A0A0A] px-4 md:px-5 py-5 md:py-6 flex flex-col gap-1.5 transition-colors',
+            'text-left bg-[#0A0A0A] px-3 md:px-5 py-4 md:py-6 flex flex-col gap-1 md:gap-1.5 transition-colors overflow-hidden',
             'hover:bg-[#E10600]/5 cursor-pointer focus:outline-none focus:ring-1 focus:ring-[#E10600]/40'
           )}
           aria-label="Open inventory with low-stock filter">
-          <span className="mono-font text-2xl md:text-3xl leading-none" style={{ color: '#E10600' }}>
+          <span className="mono-font leading-none" style={{ color: '#E10600', fontSize: 'clamp(1.05rem, 4vw, 1.85rem)' }}>
             {data.lowStockCount}
           </span>
-          <span className="text-[10px] md:text-[11px] uppercase tracking-[0.2em] text-white/40">
+          <span className="text-[10px] md:text-[11px] uppercase tracking-[0.18em] text-white/40 truncate">
             Low stock parts
           </span>
           <span className="text-[10px] text-[#E10600] uppercase tracking-widest">
@@ -123,5 +128,14 @@ export default function OverviewTab({ bookings, usedParts, inventory, expenses, 
         </button>
       </div>
     </>
+  );
+}
+
+function GroupLabel({ children }) {
+  return (
+    <div className="flex items-center gap-3 mb-2 mt-1">
+      <span className="text-[10px] uppercase tracking-[0.25em] text-white/40 font-semibold">{children}</span>
+      <span className="h-px flex-1 bg-white/5" />
+    </div>
   );
 }

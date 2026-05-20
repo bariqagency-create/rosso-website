@@ -11,7 +11,7 @@ import {
   addUsedPart, updateUsedPart, deleteUsedPart, bookingJobTotals, partTotals,
 } from '@/lib/usedParts';
 import {
-  getInvoiceNumber, openInvoiceWindow, getInvoiceWhatsAppLink,
+  getInvoiceNumber, openInvoice, getInvoiceWhatsAppLink,
 } from '@/lib/invoice';
 import {
   Field, Input, Select, TextArea, PrimaryButton, GhostButton, ErrorBanner,
@@ -389,8 +389,8 @@ function InvoiceSection({ booking, usedParts, totals, paymentStatusOverride }) {
   };
   const waLink = getInvoiceWhatsAppLink(bookingForInvoice, usedParts);
 
-  const handleView  = () => openInvoiceWindow(bookingForInvoice, usedParts, { autoPrint: false });
-  const handlePrint = () => openInvoiceWindow(bookingForInvoice, usedParts, { autoPrint: true });
+  const handleView  = () => openInvoice(booking.id, { print: false });
+  const handlePrint = () => openInvoice(booking.id, { print: true });
 
   return (
     <div>
